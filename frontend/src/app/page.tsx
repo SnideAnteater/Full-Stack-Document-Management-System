@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Document,
   Folder,
@@ -16,7 +16,9 @@ import { DocumentUploadForm } from "@/components/forms/DocumentUploadForm";
 import { FolderUploadForm } from "@/components/forms/FolderUploadForm";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { FilePlus, FolderPlus } from "lucide-react";
+import { ArrowLeft, FilePlus, FolderPlus } from "lucide-react";
+import { documentsApi } from "@/lib/api/document.service";
+import { foldersApi } from "@/lib/api/folder.service";
 
 // Sample initial data
 const initialDocuments: Document[] = [
@@ -67,11 +69,60 @@ const initialFolders: Folder[] = [
 ];
 
 export default function Home() {
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
-  const [folders, setFolders] = useState<Folder[]>(initialFolders);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFolderName, setSelectedFolderName] = useState<string>("");
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const [docsData, foldersData] = await Promise.all([
+        documentsApi.getAll(),
+        foldersApi.getAll(),
+      ]);
+      // console.log("Fetched documents:", docsData);
+      setDocuments(docsData);
+      setFolders(foldersData);
+    } catch (err) {
+      console.error("Failed to load data:", err);
+      setError("Failed to load data. Please check if the backend is running.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFolderClick = async (folderId: string) => {
+    try {
+      setIsLoading(true);
+      const folderDocs = await foldersApi.getDocumentsByFolderId(folderId);
+      const folder = folders.find((f) => f.id === folderId);
+      setDocuments(folderDocs);
+      setSelectedFolderId(folderId);
+      setSelectedFolderName(folder?.name || "");
+    } catch (err) {
+      console.error("Failed to load folder documents:", err);
+      setError("Failed to load folder documents");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackToAll = async () => {
+    setSelectedFolderId(null);
+    setSelectedFolderName("");
+    await loadData();
+  };
 
   // Filter documents and folders based on search query
   const filteredDocuments = useMemo(
@@ -85,42 +136,45 @@ export default function Home() {
   );
 
   const handleAddDocument = (data: DocumentUploadFormData) => {
-    const newDocument: Document = {
-      id: generateId(),
-      name: data.name,
-      type: data.type,
-      size: Math.floor(Math.random() * 5000000), // Random size for demo
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      folderId: data.folderId,
-    };
-
-    setDocuments((prev) => [newDocument, ...prev]);
     setIsDocumentModalOpen(false);
-  };
-
-  const handleAddFolder = (data: FolderCreateFormData) => {
-    const newFolder: Folder = {
-      id: generateId(),
-      name: data.name,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      documentCount: 0,
-    };
-
-    setFolders((prev) => [newFolder, ...prev]);
-    setIsFolderModalOpen(false);
-  };
-
-  const handleDeleteDocument = (id: string) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+    // Reload data to get the updated list
+    if (selectedFolderId) {
+      handleFolderClick(selectedFolderId);
+    } else {
+      loadData();
     }
   };
 
-  const handleDeleteFolder = (id: string) => {
+  const handleAddFolder = (data: FolderCreateFormData) => {
+    setIsFolderModalOpen(false);
+    loadData();
+  };
+
+  const handleDeleteDocument = async (id: string) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      try {
+        await documentsApi.deleteDocument(id);
+        if (selectedFolderId) {
+          handleFolderClick(selectedFolderId);
+        } else {
+          loadData();
+        }
+      } catch (err) {
+        console.error("Failed to delete document:", err);
+        setError("Failed to delete document");
+      }
+    }
+  };
+
+  const handleDeleteFolder = async (id: string) => {
     if (confirm("Are you sure you want to delete this folder?")) {
-      setFolders((prev) => prev.filter((folder) => folder.id !== id));
+      try {
+        await foldersApi.deleteFolder(id);
+        loadData();
+      } catch (err) {
+        console.error("Failed to delete folder:", err);
+        setError("Failed to delete folder");
+      }
     }
   };
 
@@ -157,6 +211,23 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Back Button and Breadcrumb */}
+        {selectedFolderId && (
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              onClick={handleBackToAll}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to All Documents
+            </Button>
+            <h2 className="mt-4 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+              {selectedFolderName}
+            </h2>
+          </div>
+        )}
+
         {/* Folders Section */}
         {filteredFolders.length > 0 && (
           <div className="mb-8">
@@ -166,7 +237,7 @@ export default function Home() {
             <FolderGrid
               folders={filteredFolders}
               onDelete={handleDeleteFolder}
-              onFolderClick={(id) => console.log("Folder clicked:", id)}
+              onFolderClick={handleFolderClick}
             />
           </div>
         )}

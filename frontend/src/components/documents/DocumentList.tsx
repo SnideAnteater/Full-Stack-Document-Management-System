@@ -28,6 +28,7 @@ const iconMap: Record<DocumentType, typeof FileText> = {
 };
 
 export function DocumentList({ documents, onDelete }: DocumentListProps) {
+  // console.log("Rendering DocumentList with documents:", documents);
   if (documents.length === 0) {
     return (
       <div className="flex min-h-50 items-center justify-center rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">
@@ -84,7 +85,7 @@ export function DocumentList({ documents, onDelete }: DocumentListProps) {
                     {document.size ? formatBytes(document.size) : "-"}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
-                    {formatDate(document.createdAt)}
+                    {formatDate(new Date(document.createdAt))}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
                     {onDelete && (

@@ -6,6 +6,7 @@ import { folderCreateSchema, FolderCreateFormData } from "@/types";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { FolderPlus } from "lucide-react";
+import { foldersApi } from "@/lib/api/folder.service";
 
 export interface FolderUploadFormProps {
   onSubmit: (data: FolderCreateFormData) => void;
@@ -28,7 +29,9 @@ export function FolderUploadForm({
     },
   });
 
-  const onFormSubmit = (data: FolderCreateFormData) => {
+  const onFormSubmit = async (data: FolderCreateFormData) => {
+    await foldersApi.createFolder(data);
+
     onSubmit(data);
     reset();
   };

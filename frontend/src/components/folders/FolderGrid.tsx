@@ -66,7 +66,7 @@ export function FolderGrid({
           </CardHeader>
           <CardContent>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Created {formatDate(folder.createdAt)}
+              Created {formatDate(new Date(folder.createdAt))}
             </p>
           </CardContent>
         </Card>

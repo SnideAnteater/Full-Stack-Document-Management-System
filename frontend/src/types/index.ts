@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+// Response interface
+export interface Response {
+  success: boolean;
+  data?: any;
+}
+
 // Document types enum
 export enum DocumentType {
   PDF = "PDF",
